@@ -16,10 +16,11 @@ def internal_get_matching() -> None:
     with engine.begin() as conn:
         row = conn.execute(
             text("SELECT * FROM rides WHERE chair_id IS NULL ORDER BY created_at LIMIT 1"
-            ).fetchone()
+            )).fetchone()
         if row is None:
             return
         ride = Ride.model_validate(row)
+        
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -56,7 +57,7 @@ def internal_get_matching() -> None:
                 ) / chair_models.speed
                 LIMIT 1
                 """
-            ),
+                ),
                 {
                     "pickup_latitude": ride.pickup_latitude,
                     "pickup_longitude": ride.pickup_longitude,
