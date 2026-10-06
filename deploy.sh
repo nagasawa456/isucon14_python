@@ -2,7 +2,9 @@
 set -euo pipefail
 
 cd /home/isucon/src
-git pull --ff-only origin main
+git fetch origin main
+git reset --hard origin/main
+
 sudo rsync -a --delete --exclude .venv /home/isucon/src/webapp/ /home/isucon/webapp/python/
 sudo rsync -a /home/isucon/src/webapp/sql/ /home/isucon/webapp/sql/
 sudo chmod +x /home/isucon/webapp/sql/init.sh
