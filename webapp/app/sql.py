@@ -9,5 +9,7 @@ password = os.getenv("ISUCON_DB_PASSWORD", "isucon")
 dbname = os.getenv("ISUCON_DB_NAME", "isuride")
 
 engine = sqlalchemy.create_engine(
-    f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}"
+    f"mysql+pymysql://{user}:{password}@{host}:{port}/{dbname}",
+    pool_size = 15,
+    max_overflow = 10,
 )
