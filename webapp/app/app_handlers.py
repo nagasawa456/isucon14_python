@@ -499,6 +499,21 @@ def app_post_ride_evaluation(
             {"id": str(ULID()), "ride_id": ride_id, "status": "COMPLETED"},
         )
 
+        conn.execute(
+            text(
+                """
+                UPDATE chairs
+                SET total_ride_count = total_ride_count + 1,
+                    total_evaluation_sum = total_evaluation_sum + :evaluation
+                WHERE id = :chair_id
+                """
+            ),
+            {"evaluation": req.evaluation, "chair_id": ride.chair_id},
+        )
+        row = conn.execute(
+            text("SELECT * FROM rides WHERE id = :id"), {"id": ride_id}
+        ).fetchone()
+        
         row = conn.execute(
             text("SELECT * FROM rides WHERE id = :id"), {"id": ride_id}
         ).fetchone()
@@ -662,10 +677,18 @@ def app_get_notification(
 
             chair: Chair = Chair.model_validate(row)
 
-            stats = get_chair_stats(conn, ride.chair_id)
-
+            if chair.total_ride_count > 0:
+                total_evaluation_avg = chair.total_evaluation_sum / chair.total_ride_count
+            else:
+                total_evaluation_avg = 0.0
             notification_response.data.chair = AppGetNotificationResponseChair(  # type: ignore[union-attr]
-                id=chair.id, name=chair.name, model=chair.model, stats=stats
+                id=chair.id,
+                name=chair.name,
+                model=chair.model,
+                stats=AppGetNotificationResponseChairStats(
+                    total_rides_count=chair.total_ride_count,
+                    total_evaluation_avg=total_evaluation_avg,
+                ),
             )
 
         if yet_sent_ride_status:
