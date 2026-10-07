@@ -1,3 +1,7 @@
+ALTER TABLE chairs
+  ADD COLUMN total_ride_count INTEGER NOT NULL DEFAULT 0,
+  ADD COLUMN total_evaluation_sum INTEGER NOT NULL DEFAULT 0;
+
 UPDATE chairs c
 JOIN (
   SELECT r.chair_id,
