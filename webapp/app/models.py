@@ -15,7 +15,7 @@ class Chair(BaseModel):
     is_active: bool
     access_token: str
     total_ride_count: int = 0
-    total_evaluation_avg: int = 0
+    total_evaluation_sum: int = 0
     created_at: datetime
     updated_at: datetime
 
