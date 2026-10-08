@@ -7,7 +7,7 @@ from sqlalchemy import text
 from ulid import ULID
 
 from .app_handlers import get_latest_ride_status
-from .middlewares import chair_auth_middleware
+from .middlewares import chair_auth_middleware, chairs_by_token
 from .models import Chair, ChairLocation, Owner, Ride, RideStatus, User
 from .sql import engine
 from .utils import secure_random_str, timestamp_millis
@@ -67,6 +67,12 @@ def chair_post_chairs(
                 "access_token": access_token,
             },
         )
+
+        row = conn.execute(
+            text("SELECT * FROM chairs WHERE id = :id"),
+            {"id": chair_id},
+        ).fetchone()
+        chairs_by_token[access_token] = Chair.model_validate(row)
 
     resp.set_cookie(path="/", key="chair_session", value=access_token)
     return ChairPostChairsResponse(id=chair_id, owner_id=owner.id)

@@ -7,7 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from ulid import ULID
 
-from .middlewares import app_auth_middleware
+from .middlewares import app_auth_middleware, users_by_token
 from .models import (
     Chair,
     ChairLocation,
@@ -71,6 +71,12 @@ def app_post_users(
                 "invitation_code": invitation_code,
             },
         )
+
+        row = conn.execute(
+            text("SELECT * FROM users WHERE id = :id"),
+            {"id": user_id},
+        ).fetchone()
+        users_by_token[access_token] = User.model_validate(row)
 
         # 初回登録キャンペーンのクーポンを付与
         conn.execute(
@@ -513,7 +519,7 @@ def app_post_ride_evaluation(
         row = conn.execute(
             text("SELECT * FROM rides WHERE id = :id"), {"id": ride_id}
         ).fetchone()
-        
+
         row = conn.execute(
             text("SELECT * FROM rides WHERE id = :id"), {"id": ride_id}
         ).fetchone()

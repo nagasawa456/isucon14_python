@@ -7,12 +7,24 @@ from sqlalchemy import text
 from .models import Chair, Owner, User
 from .sql import engine
 
+chairs_by_token: dict[str, Chair] = {}
+users_by_token: dict[str, User] = {}
+owners_by_token: dict[str, Owner] = {}
+
+def clear_auth_cache() -> None:
+    chairs_by_token.clear()
+    users_by_token.clear()
+    owners_by_token.clear()
 
 def app_auth_middleware(app_session: Annotated[str | None, Cookie()] = None) -> User:
     if not app_session:
         raise HTTPException(
             status_code=HTTPStatus.UNAUTHORIZED, detail="app_session cookie is required"
         )
+    
+    user = users_by_token.get(app_session)
+    if user is not None:
+        return user
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -25,7 +37,7 @@ def app_auth_middleware(app_session: Annotated[str | None, Cookie()] = None) -> 
                 status_code=HTTPStatus.UNAUTHORIZED, detail="invalid access token"
             )
         user = User.model_validate(row)
-
+        users_by_token[app_session] = user
         return user
 
 
@@ -38,6 +50,10 @@ def owner_auth_middleware(
             detail="owner_session cookie is required",
         )
 
+    owner = owners_by_token.get(owner_session)
+    if owner is not None:
+        return owner
+
     with engine.begin() as conn:
         row = conn.execute(
             text("SELECT * FROM owners WHERE access_token = :access_token"),
@@ -49,7 +65,9 @@ def owner_auth_middleware(
                 status_code=HTTPStatus.UNAUTHORIZED, detail="invalid access token"
             )
 
-        return Owner.model_validate(row)
+        owner = Owner.model_validate(row)
+        owners_by_token[owner_session] = owner
+        return owner
 
 
 def chair_auth_middleware(
@@ -60,6 +78,9 @@ def chair_auth_middleware(
             status_code=HTTPStatus.UNAUTHORIZED,
             detail="chair_session cookie is required",
         )
+    chair = chairs_by_token.get(chair_session)
+    if chair is not None:
+        return chair
 
     with engine.begin() as conn:
         row = conn.execute(
@@ -72,4 +93,6 @@ def chair_auth_middleware(
                 status_code=HTTPStatus.UNAUTHORIZED, detail="invalid access token"
             )
 
-        return Chair.model_validate(row)
+        chair = Chair.model_validate(row)
+        chairs_by_token[chair_session] = chair
+        return chair

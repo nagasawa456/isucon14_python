@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from ulid import ULID
 
-from .middlewares import owner_auth_middleware
+from .middlewares import owner_auth_middleware, owners_by_token
 from .models import Chair, Owner, Ride
 from .sql import engine
 from .utils import (
@@ -57,6 +57,11 @@ def owner_post_owners(
                 "chair_register_token": chair_register_token,
             },
         )
+        row = conn.execute(
+            text("SELECT * FROM owners WHERE id = :id"),
+            {"id": owner_id},
+        ).fetchone()
+        owners_by_token[access_token] = Owner.model_validate(row)
 
     response.set_cookie(path="/", key="owner_session", value=access_token)
 

@@ -10,6 +10,7 @@ from sqlalchemy import text
 from sqlalchemy.exc import SQLAlchemyError
 
 from . import app_handlers, chair_handlers, internal_handlers, owner_handlers
+from .middlewares import clear_auth_cache
 from .sql import engine
 
 app = FastAPI()
@@ -37,6 +38,8 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
             status_code=HTTPStatus.INTERNAL_SERVER_ERROR,
             detail=f"failed to initialize: {result.stdout.decode()}",
         )
+    
+    clear_auth_cache()
 
     with engine.begin() as conn:
         conn.execute(
