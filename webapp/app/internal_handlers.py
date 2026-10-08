@@ -63,8 +63,8 @@ def internal_get_matching() -> None:
                 candidates,
                 key=lambda chair: (abs(chair.latitude - ride.pickup_latitude)
                 + abs(chair.longitude - ride.pickup_longitude) 
-                + abs(chair.latitude - ride.destination_latitude) 
-                + abs(chair.longitude - ride.destination_longitude)) / chair.speed,
+                + abs(ride.pickup_latitude - ride.destination_latitude) 
+                + abs(ride.pickup_longitude - ride.destination_longitude)) / chair.speed,
             )
             params.append(
                 {
