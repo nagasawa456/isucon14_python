@@ -12,7 +12,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from . import app_handlers, chair_handlers, internal_handlers, owner_handlers
 from .middlewares import clear_auth_cache
 from .sql import engine
-from .dictionary import chairs_by_token, users_by_token, owners_by_token
+
 app = FastAPI()
 app.include_router(app_handlers.router)
 app.include_router(chair_handlers.router)

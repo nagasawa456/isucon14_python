@@ -9,7 +9,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from ulid import ULID
 
-from .middlewares import owner_auth_middleware
+from .middlewares import owner_auth_middleware, owners_by_token
 from .models import Chair, Owner, Ride
 from .sql import engine
 from .utils import (
@@ -18,8 +18,6 @@ from .utils import (
     sum_sales,
     timestamp_millis,
 )
-from .dictionary import owners_by_token
-
 
 router = APIRouter(prefix="/api/owner")
 

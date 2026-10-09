@@ -12,10 +12,7 @@ from .models import Chair, ChairLocation, Owner, Ride, RideStatus, User
 from .sql import engine
 from .utils import secure_random_str, timestamp_millis
 
-from collections import deque
-from .dictionary import unsent_by_ride, latest_status_by_ride
 router = APIRouter(prefix="/api/chair")
-
 
 
 class ChairPostChairsRequest(BaseModel):
@@ -148,32 +145,24 @@ def chair_post_coordinate(
                     and req.longitude == ride.pickup_longitude
                     and ride_status == "ENROUTE"
                 ):
-                    status_id = str(ULID())
                     conn.execute(
                         text(
                             "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                         ),
-                        {"id": status_id, "ride_id": ride.id, "status": "PICKUP"},
+                        {"id": str(ULID()), "ride_id": ride.id, "status": "PICKUP"},
                     )
-                    unsent_by_ride[ride.id].append({"id": status_id, "status": "PICKUP"})
-                    
-                    latest_status_by_ride[ride.id] = "PICKUP"
 
                 if (
                     req.latitude == ride.destination_latitude
                     and req.longitude == ride.destination_longitude
                     and ride_status == "CARRYING"
                 ):
-                    status_id = str(ULID())
                     conn.execute(
                         text(
                             "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status) "
                         ),
-                        {"id": status_id, "ride_id": ride.id, "status": "ARRIVED"},
+                        {"id": str(ULID()), "ride_id": ride.id, "status": "ARRIVED"},
                     )
-                    unsent_by_ride[ride.id].append({"id": status_id, "status": "ARRIVED"})
-                    
-                    latest_status_by_ride[ride.id] = "ARRIVED"
 
     return ChairPostCoordinateResponse(
         recorded_at=timestamp_millis(location.created_at)
@@ -202,44 +191,33 @@ class ChairGetNotificationResponse(BaseModel):
 def chair_get_notification(
     chair: Annotated[Chair, Depends(chair_auth_middleware)],
 ) -> ChairGetNotificationResponse:
-
-
     with engine.begin() as conn:
+        ride_status = ""
         row = conn.execute(
-            text("SELECT * FROM rides WHERE chair_id = :chair_id ORDER BY updated_at DESC LIMIT 1"),
+            text(
+                "SELECT * FROM rides WHERE chair_id = :chair_id ORDER BY updated_at DESC LIMIT 1"
+            ),
             {"chair_id": chair.id},
         ).fetchone()
+
         if row is None:
             return ChairGetNotificationResponse(data=None, retry_after_ms=30)
+
         ride = Ride.model_validate(row)
         yet_sent_ride_status: RideStatus | None = None
-        queue = unsent_by_ride.get(ride.id, [])
-        if queue:
-            yet_sent_ride_status = queue[0]
-            ride_status = yet_sent_ride_status["status"]
+        row = conn.execute(
+            text(
+                "SELECT * FROM ride_statuses WHERE ride_id = :ride_id AND chair_sent_at IS NULL ORDER BY created_at ASC LIMIT 1"
+            ),
+            {"ride_id": ride.id},
+        ).fetchone()
+
+        if row is None:
+            ride_status = get_latest_ride_status(conn, ride.id)
         else:
-            yet_sent_ride_status = None
-            ride_status = latest_status_by_ride.get(ride.id)
-            if ride_status is None:
-                ride_status = get_latest_ride_status(conn, ride.id)
-
-
-        
-    
-        
-        # row = conn.execute(
-        #     text(
-        #         "SELECT * FROM ride_statuses WHERE ride_id = :ride_id AND chair_sent_at IS NULL ORDER BY created_at ASC LIMIT 1"
-        #     ),
-        #     {"ride_id": ride.id},
-        # ).fetchone()
-
-        # if row is None:
-        #     ride_status = get_latest_ride_status(conn, ride.id)
-        # else:
-        #     yet_sent_ride_status = RideStatus.model_validate(row)
-        #     assert yet_sent_ride_status is not None
-        #     ride_status = yet_sent_ride_status.status
+            yet_sent_ride_status = RideStatus.model_validate(row)
+            assert yet_sent_ride_status is not None
+            ride_status = yet_sent_ride_status.status
 
         row = conn.execute(
             text("SELECT * FROM users WHERE id = :id FOR SHARE"), {"id": ride.user_id}
@@ -253,10 +231,8 @@ def chair_get_notification(
                 text(
                     "UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
                 ),
-                {"id": yet_sent_ride_status["id"]},
+                {"id": yet_sent_ride_status.id},
             )
-            unsent_by_ride[ride.id].pop(0)
-
 
     return ChairGetNotificationResponse(
         data=ChairGetNotificationResponseData(
@@ -302,19 +278,14 @@ def chair_post_ride_status(
         match req.status:
             # Acknowledge the ride
             case "ENROUTE":
-                status_id = str(ULID())
                 conn.execute(
                     text(
                         "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                     ),
-                    {"id": status_id, "ride_id": ride.id, "status": "ENROUTE"},
-                )   
-                unsent_by_ride[ride.id].append({"id": status_id, "status": "ENROUTE"})
-                
-                latest_status_by_ride[ride.id] = "ENROUTE"
+                    {"id": str(ULID()), "ride_id": ride.id, "status": "ENROUTE"},
+                )
             # After Picking up user
             case "CARRYING":
-                status_id = str(ULID())
                 ride_status = get_latest_ride_status(conn, ride.id)
                 if ride_status != "PICKUP":
                     raise HTTPException(
@@ -325,11 +296,8 @@ def chair_post_ride_status(
                     text(
                         "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                     ),
-                    {"id": status_id, "ride_id": ride.id, "status": "CARRYING"},
+                    {"id": str(ULID()), "ride_id": ride.id, "status": "CARRYING"},
                 )
-                unsent_by_ride[ride.id].append({"id": status_id, "status": "CARRYING"})
-                
-                latest_status_by_ride[ride.id] = "CARRYING"
             case _:
                 raise HTTPException(
                     status_code=HTTPStatus.BAD_REQUEST, detail="invalid status"

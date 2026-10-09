@@ -6,8 +6,7 @@ from pydantic import BaseModel
 from sqlalchemy import text
 from sqlalchemy.engine import Connection
 from ulid import ULID
-from collections import deque
-from .dictionary import unsent_by_ride, latest_status_by_ride
+
 from .middlewares import app_auth_middleware, users_by_token
 from .models import (
     Chair,
@@ -325,17 +324,13 @@ def app_post_rides(
                 "destination_longitude": req.destination_coordinate.longitude,
             },
         )
-        status_id = str(ULID())
 
         conn.execute(
             text(
                 "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
             ),
-            {"id": status_id, "ride_id": ride_id, "status": "MATCHING"},
+            {"id": str(ULID()), "ride_id": ride_id, "status": "MATCHING"},
         )
-        unsent_by_ride.setdefault(ride_id, [])
-        unsent_by_ride[ride_id].append({"id": status_id, "status": "MATCHING"})
-        latest_status_by_ride[ride_id] = "MATCHING"
 
         ride_count = conn.execute(
             text("SELECT COUNT(*) FROM rides WHERE user_id = :user_id"),
@@ -503,16 +498,12 @@ def app_post_ride_evaluation(
                 status_code=HTTPStatus.NOT_FOUND, detail="ride not found"
             )
 
-        status_id = str(ULID())
         conn.execute(
             text(
                 "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
             ),
-            {"id": status_id, "ride_id": ride_id, "status": "COMPLETED"},
+            {"id": str(ULID()), "ride_id": ride_id, "status": "COMPLETED"},
         )
-        unsent_by_ride[ride_id].append({"id": status_id, "status": "COMPLETED"})
-        
-        latest_status_by_ride[ride_id] = "COMPLETED"
 
         conn.execute(
             text(
@@ -713,8 +704,6 @@ def app_get_notification(
                 ),
                 {"yet_send_ride_status_id": yet_sent_ride_status.id},
             )
-
-
 
     return notification_response
 

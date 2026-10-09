@@ -7,14 +7,14 @@ from sqlalchemy import text
 from .models import Chair, Owner, User
 from .sql import engine
 
-from .dictionary import chairs_by_token, users_by_token, owners_by_token, unsent_by_ride, latest_status_by_ride
+chairs_by_token: dict[str, Chair] = {}
+users_by_token: dict[str, User] = {}
+owners_by_token: dict[str, Owner] = {}
 
 def clear_auth_cache() -> None:
     chairs_by_token.clear()
     users_by_token.clear()
     owners_by_token.clear()
-    unsent_by_ride.clear()
-    latest_status_by_ride.clear()
 
 def app_auth_middleware(app_session: Annotated[str | None, Cookie()] = None) -> User:
     if not app_session:
