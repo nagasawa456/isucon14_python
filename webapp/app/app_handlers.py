@@ -10,7 +10,6 @@ from ulid import ULID
 from .middlewares import app_auth_middleware, users_by_token
 from .models import (
     Chair,
-    ChairLocation,
     Owner,
     PaymentToken,
     Ride,
@@ -787,69 +786,57 @@ def app_get_nearby_chairs(
     longitude: int,
     distance: int = 50,
 ) -> AppGetNearByChairsResponse:
-    coordinate = Coordinate(latitude=latitude, longitude=longitude)
     with engine.begin() as conn:
-        chairs = conn.execute(
-            text("SELECT * FROM chairs"),
+        # 稼働中で、未完了ライドがなく、最新座標が距離内の椅子だけを1回で取る
+        rows = conn.execute(
+            text(
+                """
+                SELECT id, name, model, latitude, longitude
+                FROM (
+                  SELECT c.id,
+                         c.name,
+                         c.model,
+                         cl.latitude,
+                         cl.longitude,
+                         ROW_NUMBER() OVER (
+                           PARTITION BY c.id
+                           ORDER BY cl.created_at DESC, cl.id DESC
+                         ) AS rn
+                  FROM chairs c
+                  INNER JOIN chair_locations cl ON cl.chair_id = c.id
+                  WHERE c.is_active = TRUE
+                    AND NOT EXISTS (
+                      SELECT 1
+                      FROM rides r
+                      WHERE r.chair_id = c.id
+                        AND IFNULL((
+                          SELECT rs.status
+                          FROM ride_statuses rs
+                          WHERE rs.ride_id = r.id
+                          ORDER BY rs.created_at DESC, rs.id DESC
+                          LIMIT 1
+                        ), '') <> 'COMPLETED'
+                    )
+                ) latest
+                WHERE rn = 1
+                  AND ABS(latitude - :latitude) + ABS(longitude - :longitude) <= :distance
+                """
+            ),
+            {"latitude": latitude, "longitude": longitude, "distance": distance},
         ).fetchall()
 
-        near_by_chairs = []
-        for chair in chairs:
-            if not chair.is_active:
-                continue
-
-            rows = conn.execute(
-                text(
-                    "SELECT * FROM rides WHERE chair_id = :chair_id ORDER BY created_at DESC"
+        near_by_chairs = [
+            AppGetNearbyChairsResponseChair(
+                id=row.id,
+                name=row.name,
+                model=row.model,
+                current_coordinate=Coordinate(
+                    latitude=row.latitude,
+                    longitude=row.longitude,
                 ),
-                {"chair_id": chair.id},
-            ).fetchall()
-            rides = [Ride.model_validate(row) for row in rows]
-
-            skip = False
-
-            for ride in rides:
-                # 過去にライドが存在し、かつ、それが完了していない場合はスキップ
-                status = get_latest_ride_status(conn, ride.id)
-                if status != "COMPLETED":
-                    skip = True
-                    break
-
-            if skip:
-                continue
-
-            # 最新の位置情報を取得
-            row = conn.execute(
-                text(
-                    "SELECT * FROM chair_locations WHERE chair_id = :chair_id ORDER BY created_at DESC LIMIT 1"
-                ),
-                {"chair_id": chair.id},
-            ).fetchone()
-            if row is None:
-                continue
-
-            chair_location = ChairLocation.model_validate(row)
-
-            if (
-                calculate_distance(
-                    coordinate.latitude,
-                    coordinate.longitude,
-                    chair_location.latitude,
-                    chair_location.longitude,
-                )
-                <= distance
-            ):
-                near_by_chairs.append(
-                    AppGetNearbyChairsResponseChair(
-                        id=chair.id,
-                        name=chair.name,
-                        model=chair.model,
-                        current_coordinate=Coordinate(
-                            latitude=chair_location.latitude,
-                            longitude=chair_location.longitude,
-                        ),
-                    )
-                )
+            )
+            for row in rows
+        ]
         retrieved_at = conn.execute(text("SELECT CURRENT_TIMESTAMP(6)")).scalar()
         assert retrieved_at is not None
 
