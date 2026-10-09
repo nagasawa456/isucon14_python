@@ -315,6 +315,7 @@ def chair_post_ride_status(
             # After Picking up user
             case "CARRYING":
                 status_id = str(ULID())
+                ride_status = get_latest_ride_status(conn, ride.id)
                 if ride_status != "PICKUP":
                     raise HTTPException(
                         status_code=HTTPStatus.BAD_REQUEST,
