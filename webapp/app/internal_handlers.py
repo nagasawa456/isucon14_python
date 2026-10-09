@@ -15,7 +15,7 @@ def internal_get_matching() -> None:
     # 最も待たせているリクエストに、乗車地点へ最も早く到着できる空車をマッチさせる
     with engine.begin() as conn:
         rides = conn.execute(
-            text("SELECT id, pickup_latitude, pickup_longitude FROM rides WHERE chair_id IS NULL ORDER BY created_at"
+            text("SELECT id, pickup_latitude, pickup_longitude, destination_latitude, destination_longitude FROM rides WHERE chair_id IS NULL ORDER BY created_at"
             )).fetchall()
         if not rides:
             return
@@ -24,8 +24,9 @@ def internal_get_matching() -> None:
         chairs = conn.execute(
             text(
                 """
-                SELECT c.id, loc.latitude, loc.longitude
+                SELECT c.id, loc.latitude, loc.longitude, cm.speed
                 FROM chairs c
+                JOIN chair_models cm ON cm.name = c.model
                 JOIN (
                   SELECT cl.chair_id, cl.latitude, cl.longitude
                   FROM chair_locations cl
@@ -60,8 +61,10 @@ def internal_get_matching() -> None:
                 break
             nearest = min(
                 candidates,
-                key=lambda chair: abs(chair.latitude - ride.pickup_latitude)
-                + abs(chair.longitude - ride.pickup_longitude),
+                key=lambda chair: (abs(chair.latitude - ride.pickup_latitude)
+                + abs(chair.longitude - ride.pickup_longitude) 
+                + abs(ride.pickup_latitude - ride.destination_latitude) 
+                + abs(ride.pickup_longitude - ride.destination_longitude)) / chair.speed,
             )
             params.append(
                 {
