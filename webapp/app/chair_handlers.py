@@ -11,7 +11,7 @@ from .middlewares import chair_auth_middleware, chairs_by_token
 from .models import Chair, ChairLocation, Owner, Ride, RideStatus, User
 from .sql import engine
 from .utils import secure_random_str, timestamp_millis
-
+import datetime
 router = APIRouter(prefix="/api/chair")
 
 
@@ -110,25 +110,23 @@ def chair_post_coordinate(
 ) -> ChairPostCoordinateResponse:
     with engine.begin() as conn:
         chair_location_id = str(ULID())
+        recorded_at = datetime.datetime.now()
         conn.execute(
             text(
-                "INSERT INTO chair_locations (id, chair_id, latitude, longitude) VALUES (:id, :chair_id, :latitude, :longitude)"
+                "INSERT INTO chair_locations (id, chair_id, latitude, longitude, created_at) VALUES (:id, :chair_id, :latitude, :longitude, :created_at)"
             ),
             {
                 "id": chair_location_id,
                 "chair_id": chair.id,
                 "latitude": req.latitude,
                 "longitude": req.longitude,
+                "created_at": recorded_at,
             },
         )
 
-        row = conn.execute(
-            text("SELECT * FROM chair_locations WHERE id = :id"),
-            {"id": chair_location_id},
-        ).fetchone()
-        if row is None:
-            raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        location = ChairLocation.model_validate(row)
+    # ここで SELECT しない。時刻は recorded_at として既にある
+
+    # ライドの SELECT と、PICKUP / ARRIVED の INSERT はこのまま残す
 
         row = conn.execute(
             text(
@@ -165,7 +163,7 @@ def chair_post_coordinate(
                     )
 
     return ChairPostCoordinateResponse(
-        recorded_at=timestamp_millis(location.created_at)
+        recorded_at=timestamp_millis(recorded_at)
     )
 
 
