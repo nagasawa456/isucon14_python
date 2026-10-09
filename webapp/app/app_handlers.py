@@ -617,7 +617,7 @@ class AppGetNotificationResponse(BaseModel):
 def app_get_notification(
     user: Annotated[User, Depends(app_auth_middleware)],
 ) -> AppGetNotificationResponse:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         row = conn.execute(
             text(
                 "SELECT * FROM rides WHERE user_id = :user_id ORDER BY created_at DESC LIMIT 1"
@@ -625,24 +625,25 @@ def app_get_notification(
             {"user_id": user.id},
         ).fetchone()
         if row is None:
-            notification_response = AppGetNotificationResponse(retry_after_ms=30)
-            return notification_response
+            return AppGetNotificationResponse(retry_after_ms=30)
 
         ride: Ride = Ride.model_validate(row)
 
-        row = conn.execute(
+        yet_row = conn.execute(
             text(
                 "SELECT * FROM ride_statuses WHERE ride_id = :ride_id AND app_sent_at IS NULL ORDER BY created_at ASC LIMIT 1"
             ),
             {"ride_id": ride.id},
         ).fetchone()
-        yet_sent_ride_status: RideStatus | None = None
-        if row is None:
-            status = get_latest_ride_status(conn, ride.id)
-        else:
-            yet_sent_ride_status = RideStatus.model_validate(row)
-            status = yet_sent_ride_status.status
 
+        if yet_row is None:
+            return AppGetNotificationResponse(retry_after_ms=30)
+
+    
+
+    yet_sent = RideStatus.model_validate(yet_row)
+
+    with engine.begin() as conn:
         fare = calculate_discounted_fare(
             conn,
             user.id,
@@ -652,7 +653,6 @@ def app_get_notification(
             ride.destination_latitude,
             ride.destination_longitude,
         )
-
         notification_response = AppGetNotificationResponse(
             data=AppGetNotificationResponseData(
                 ride_id=ride.id,
@@ -664,7 +664,7 @@ def app_get_notification(
                     longitude=ride.destination_longitude,
                 ),
                 fare=fare,
-                status=status,
+                status=yet_sent.status,
                 chair=None,
                 created_at=timestamp_millis(ride.created_at),
                 updated_at=timestamp_millis(ride.updated_at),
@@ -679,14 +679,12 @@ def app_get_notification(
             ).fetchone()
             if row is None:
                 raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-
-            chair: Chair = Chair.model_validate(row)
-
+            chair = Chair.model_validate(row)
             if chair.total_ride_count > 0:
                 total_evaluation_avg = chair.total_evaluation_sum / chair.total_ride_count
             else:
                 total_evaluation_avg = 0.0
-            notification_response.data.chair = AppGetNotificationResponseChair(  # type: ignore[union-attr]
+            notification_response.data.chair = AppGetNotificationResponseChair(
                 id=chair.id,
                 name=chair.name,
                 model=chair.model,
@@ -696,16 +694,14 @@ def app_get_notification(
                 ),
             )
 
-        if yet_sent_ride_status:
-            conn.execute(
-                text(
-                    "UPDATE ride_statuses SET app_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :yet_send_ride_status_id"
-                ),
-                {"yet_send_ride_status_id": yet_sent_ride_status.id},
-            )
+        conn.execute(
+            text(
+                "UPDATE ride_statuses SET app_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
+            ),
+            {"id": yet_sent.id},
+        )
 
     return notification_response
-
 
 class RecentRide(BaseModel):
     id: str

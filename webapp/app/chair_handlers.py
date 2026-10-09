@@ -191,48 +191,42 @@ class ChairGetNotificationResponse(BaseModel):
 def chair_get_notification(
     chair: Annotated[Chair, Depends(chair_auth_middleware)],
 ) -> ChairGetNotificationResponse:
-    with engine.begin() as conn:
-        ride_status = ""
+    with engine.connect() as conn:
         row = conn.execute(
             text(
                 "SELECT * FROM rides WHERE chair_id = :chair_id ORDER BY updated_at DESC LIMIT 1"
             ),
             {"chair_id": chair.id},
         ).fetchone()
-
         if row is None:
             return ChairGetNotificationResponse(data=None, retry_after_ms=30)
 
         ride = Ride.model_validate(row)
-        yet_sent_ride_status: RideStatus | None = None
-        row = conn.execute(
+        yet_row = conn.execute(
             text(
                 "SELECT * FROM ride_statuses WHERE ride_id = :ride_id AND chair_sent_at IS NULL ORDER BY created_at ASC LIMIT 1"
             ),
             {"ride_id": ride.id},
         ).fetchone()
 
-        if row is None:
-            ride_status = get_latest_ride_status(conn, ride.id)
-        else:
-            yet_sent_ride_status = RideStatus.model_validate(row)
-            assert yet_sent_ride_status is not None
-            ride_status = yet_sent_ride_status.status
+    if yet_row is None:
+        return ChairGetNotificationResponse(data=None, retry_after_ms=30)
 
+    yet_sent = RideStatus.model_validate(yet_row)
+    with engine.begin() as conn:
         row = conn.execute(
-            text("SELECT * FROM users WHERE id = :id FOR SHARE"), {"id": ride.user_id}
+            text("SELECT * FROM users WHERE id = :id FOR SHARE"),
+            {"id": ride.user_id},
         ).fetchone()
         if row is None:
             raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
         user = User.model_validate(row)
-
-        if yet_sent_ride_status:
-            conn.execute(
-                text(
-                    "UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
-                ),
-                {"id": yet_sent_ride_status.id},
-            )
+        conn.execute(
+            text(
+                "UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
+            ),
+            {"id": yet_sent.id},
+        )
 
     return ChairGetNotificationResponse(
         data=ChairGetNotificationResponseData(
@@ -242,13 +236,13 @@ def chair_get_notification(
                 latitude=ride.pickup_latitude, longitude=ride.pickup_longitude
             ),
             destination_coordinate=Coordinate(
-                latitude=ride.destination_latitude, longitude=ride.destination_longitude
+                latitude=ride.destination_latitude,
+                longitude=ride.destination_longitude,
             ),
-            status=ride_status,
+            status=yet_sent.status,
         ),
         retry_after_ms=30,
     )
-
 
 class PostChairRidesRideIDStatusRequest(BaseModel):
     status: str
