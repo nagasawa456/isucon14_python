@@ -809,7 +809,6 @@ def app_get_nearby_chairs(
                           LIMIT 1
                         ), '') <> 'COMPLETED'
                     )
-                )
                 """
             ),
             {"latitude": latitude, "longitude": longitude, "distance": distance},
