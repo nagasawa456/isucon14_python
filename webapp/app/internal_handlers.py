@@ -24,21 +24,15 @@ def internal_get_matching() -> None:
         chairs = conn.execute(
             text(
                 """
-                SELECT c.id, loc.latitude, loc.longitude, cm.speed
+                SELECT c.id,
+                       c.latest_latitude AS latitude, 
+                       c.latest_longitude AS longitude, 
+                       cm.speed
                 FROM chairs c
                 JOIN chair_models cm ON cm.name = c.model
-                JOIN (
-                  SELECT cl.chair_id, cl.latitude, cl.longitude
-                  FROM chair_locations cl
-                  JOIN (
-                    SELECT chair_id, MAX(created_at) AS latest
-                    FROM chair_locations
-                    GROUP BY chair_id
-                  ) AS t 
-                  ON cl.chair_id = t.chair_id AND cl.created_at = t.latest
-                ) AS loc
-                ON c.id = loc.chair_id
                 WHERE c.is_active = TRUE
+                  AND c.latest_latitude IS NOT NULL
+                  AND c.latest_longitude IS NOT NULL
                   AND NOT EXISTS (
                     SELECT 1
                     FROM rides r
