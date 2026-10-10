@@ -33,6 +33,9 @@ from .utils import (
 
 router = APIRouter(prefix="/api/app")
 
+# 通知の問い合わせ間隔（ミリ秒）
+APP_NOTIFICATION_RETRY_AFTER_MS = 100
+
 
 class AppPostUsersRequest(BaseModel):
     username: str
@@ -625,7 +628,7 @@ def app_get_notification(
             {"user_id": user.id},
         ).fetchone()
         if row is None:
-            return AppGetNotificationResponse(retry_after_ms=30)
+            return AppGetNotificationResponse(retry_after_ms=APP_NOTIFICATION_RETRY_AFTER_MS)
 
         ride: Ride = Ride.model_validate(row)
 
@@ -637,7 +640,7 @@ def app_get_notification(
         ).fetchone()
 
         if yet_row is None:
-            return AppGetNotificationResponse(retry_after_ms=30)
+            return AppGetNotificationResponse(retry_after_ms=APP_NOTIFICATION_RETRY_AFTER_MS)
 
     
 
@@ -669,7 +672,7 @@ def app_get_notification(
                 created_at=timestamp_millis(ride.created_at),
                 updated_at=timestamp_millis(ride.updated_at),
             ),
-            retry_after_ms=30,
+            retry_after_ms=APP_NOTIFICATION_RETRY_AFTER_MS,
         )
 
         if ride.chair_id:

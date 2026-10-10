@@ -14,6 +14,9 @@ from .utils import secure_random_str, timestamp_millis
 import datetime
 router = APIRouter(prefix="/api/chair")
 
+# 通知の問い合わせ間隔（ミリ秒）
+CHAIR_NOTIFICATION_RETRY_AFTER_MS = 100
+
 
 class ChairPostChairsRequest(BaseModel):
     name: str
@@ -215,7 +218,7 @@ def chair_get_notification(
             {"chair_id": chair.id},
         ).fetchone()
         if row is None:
-            return ChairGetNotificationResponse(data=None, retry_after_ms=30)
+            return ChairGetNotificationResponse(data=None, retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS)
 
         ride = Ride.model_validate(row)
         yet_row = conn.execute(
@@ -226,7 +229,7 @@ def chair_get_notification(
         ).fetchone()
 
     if yet_row is None:
-        return ChairGetNotificationResponse(data=None, retry_after_ms=30)
+        return ChairGetNotificationResponse(data=None, retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS)
 
     yet_sent = RideStatus.model_validate(yet_row)
     with engine.begin() as conn:
@@ -257,7 +260,7 @@ def chair_get_notification(
             ),
             status=yet_sent.status,
         ),
-        retry_after_ms=30,
+        retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS,
     )
 
 class PostChairRidesRideIDStatusRequest(BaseModel):
