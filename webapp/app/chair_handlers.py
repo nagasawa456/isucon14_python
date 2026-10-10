@@ -124,6 +124,24 @@ def chair_post_coordinate(
             },
         )
 
+        conn.execute(
+            text(
+                """
+                UPDATE chairs
+                SET total_distance = total_distance + IFNULL(ABS(:latitude - latest_latitude) + ABS(:longitude - latest_longitude), 0)
+                    total_distance_updated_at = :recorded_at,
+                    latest_latitude = :latitude,
+                    latest_longitude = :longitude
+                WHERE id = :chair_id
+            """),
+            {
+                "chair_id": chair.id,
+                "latitude": req.latitude,
+                "longitude": req.longitude,
+                "recorded_at": recorded_at,
+            }
+        )
+
     # ここで SELECT しない。時刻は recorded_at として既にある
 
     # ライドの SELECT と、PICKUP / ARRIVED の INSERT はこのまま残す

@@ -792,15 +792,13 @@ def app_get_nearby_chairs(
                   SELECT c.id,
                          c.name,
                          c.model,
-                         cl.latitude,
-                         cl.longitude,
-                         ROW_NUMBER() OVER (
-                           PARTITION BY c.id
-                           ORDER BY cl.created_at DESC, cl.id DESC
-                         ) AS rn
+                         c.latest_latitude AS latitude,
+                         c.latest_longitude AS longitude,
                   FROM chairs c
-                  INNER JOIN chair_locations cl ON cl.chair_id = c.id
                   WHERE c.is_active = TRUE
+                    AND c.latest_latitude IS NOT NULL
+                    AND c.latest_longitude IS NOT NULL
+                    AND ABS(c.latest_latitude - :latitude) + ABS(c.latest_longitude - :longitude) <= :distance
                     AND NOT EXISTS (
                       SELECT 1
                       FROM rides r
@@ -813,9 +811,7 @@ def app_get_nearby_chairs(
                           LIMIT 1
                         ), '') <> 'COMPLETED'
                     )
-                ) latest
-                WHERE rn = 1
-                  AND ABS(latitude - :latitude) + ABS(longitude - :longitude) <= :distance
+                )
                 """
             ),
             {"latitude": latitude, "longitude": longitude, "distance": distance},

@@ -69,9 +69,25 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
                     GROUP BY chair_id
             ) AS d ON d.chair_id = c.id
             SET c.total_distance = d.total_distance,
-                c.total_distance_updated_at = d.total_distance_updated_at
+                c.total_distance_updated_at = d.total_distance_updated_at;
         """)
     )
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE chairs c
+                JOIN (SELECT cl.chair_id, cl.latitude, cl.longitude
+                    FROM chair_locations cl
+                    JOIN (SELECT chair_id, MAX(created_at) AS latest
+                        FROM chair_locations
+                        GROUP BY chair_id) AS t ON cl.chair_id = t.chair_id AND cl.created_at = t.latest
+                        ) AS l ON l.chair_id = c.id
+                        SET c.latest_latitude = l.latitude,
+                            c.latest_longitude = l.longitude;
+            """)
+        )
 
     with engine.begin() as conn:
         conn.execute(
