@@ -787,13 +787,11 @@ def app_get_nearby_chairs(
         rows = conn.execute(
             text(
                 """
-                SELECT id, name, model, latitude, longitude
-                FROM (
                   SELECT c.id,
                          c.name,
                          c.model,
                          c.latest_latitude AS latitude,
-                         c.latest_longitude AS longitude,
+                         c.latest_longitude AS longitude
                   FROM chairs c
                   WHERE c.is_active = TRUE
                     AND c.latest_latitude IS NOT NULL
