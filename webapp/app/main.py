@@ -41,17 +41,7 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
     
     clear_auth_cache()
 
-    with engine.begin() as conn:
-        conn.execute(
-            text(
-                """
-                ALTER TABLE chairs
-                    ADD COLUMN latest_latitude INTEGER NULL COMMENT '最新の緯度',
-                    ADD COLUMN latest_longitude INTEGER NULL COMMENT '最新の経度',
-                    ADD COLUMN total_distance INTEGER NOT NULL DEFAULT 0 COMMENT '総走行距離',
-                    ADD COLUMN total_distance_updated_at DATETIME(6) NULL COMMENT '総走行距離の更新日時';
-            """)
-        )
+
 
     with engine.begin() as conn:
         conn.execute(

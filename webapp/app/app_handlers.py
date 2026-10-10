@@ -793,9 +793,9 @@ def app_get_nearby_chairs(
                          c.latest_latitude AS latitude,
                          c.latest_longitude AS longitude
                   FROM chairs c
-                  WHERE c.is_active = TRUE
-                    AND c.latest_latitude IS NOT NULL
-                    AND c.latest_longitude IS NOT NULL
+                    WHERE c.is_active = TRUE
+                    AND c.latest_latitude BETWEEN :latitude - :distance AND :latitude + :distance
+                    AND c.latest_longitude BETWEEN :longitude - :distance AND :longitude + :distance
                     AND ABS(c.latest_latitude - :latitude) + ABS(c.latest_longitude - :longitude) <= :distance
                     AND NOT EXISTS (
                       SELECT 1

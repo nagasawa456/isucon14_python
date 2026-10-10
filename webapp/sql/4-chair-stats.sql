@@ -1,6 +1,11 @@
 ALTER TABLE chairs
-  ADD COLUMN total_ride_count INTEGER NOT NULL DEFAULT 0,
-  ADD COLUMN total_evaluation_sum INTEGER NOT NULL DEFAULT 0;
+    ADD COLUMN total_ride_count INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN total_evaluation_sum INTEGER NOT NULL DEFAULT 0,
+    ADD COLUMN latest_latitude INTEGER NULL COMMENT '最新の緯度',
+    ADD COLUMN latest_longitude INTEGER NULL COMMENT '最新の経度',
+    ADD COLUMN total_distance INTEGER NOT NULL DEFAULT 0 COMMENT '総走行距離',
+    ADD COLUMN total_distance_updated_at DATETIME(6) NULL COMMENT '総走行距離の更新日時',
+    ADD INDEX idx_active_lat (is_active, latest_latitude);
 
 UPDATE chairs c
 JOIN (
