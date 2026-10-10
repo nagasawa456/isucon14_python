@@ -44,6 +44,38 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
     with engine.begin() as conn:
         conn.execute(
             text(
+                """
+                ALTER TABLE chairs
+                    ADD COLUMN latest_latitude INTEGER NULL COMMENT '最新の緯度',
+                    ADD COLUMN latest_longitude INTEGER NULL COMMENT '最新の経度',
+                    ADD COLUMN total_distance INTEGER NOT NULL DEFAULT 0 COMMENT '総走行距離',
+                    ADD COLUMN total_distance_updated_at DATETIME(6) NULL COMMENT '総走行距離の更新日時';
+            """)
+        )
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
+                """
+                UPDATE chairs c
+            JOIN (SELECT chair_id,
+                SUM(IFNULL(distance, 0)) AS total_distance,
+                MAX(created_at)          AS total_distance_updated_at
+                FROM (SELECT chair_id,
+                    created_at,
+                    ABS(latitude - LAG(latitude) OVER (PARTITION BY chair_id ORDER BY created_at)) +
+                    ABS(longitude - LAG(longitude) OVER (PARTITION BY chair_id ORDER BY created_at)) AS distance
+                    FROM chair_locations) tmp
+                    GROUP BY chair_id
+            ) AS d ON d.chair_id = c.id
+            SET c.total_distance = d.total_distance,
+                c.total_distance_updated_at = d.total_distance_updated_at
+        """)
+    )
+
+    with engine.begin() as conn:
+        conn.execute(
+            text(
                 "UPDATE settings SET value = :value WHERE name = 'payment_gateway_url'",
             ),
             {"value": req.payment_server},
