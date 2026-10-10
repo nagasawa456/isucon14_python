@@ -15,7 +15,7 @@ import datetime
 router = APIRouter(prefix="/api/chair")
 
 # 通知の問い合わせ間隔（ミリ秒）
-CHAIR_NOTIFICATION_RETRY_AFTER_MS = 100
+CHAIR_NOTIFICATION_RETRY_AFTER_MS = 50
 
 
 class ChairPostChairsRequest(BaseModel):

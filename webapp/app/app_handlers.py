@@ -34,7 +34,7 @@ from .utils import (
 router = APIRouter(prefix="/api/app")
 
 # 通知の問い合わせ間隔（ミリ秒）
-APP_NOTIFICATION_RETRY_AFTER_MS = 100
+APP_NOTIFICATION_RETRY_AFTER_MS = 300
 
 
 class AppPostUsersRequest(BaseModel):
