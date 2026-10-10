@@ -128,7 +128,7 @@ def chair_post_coordinate(
             text(
                 """
                 UPDATE chairs
-                SET total_distance = total_distance + IFNULL(ABS(:latitude - latest_latitude) + ABS(:longitude - latest_longitude), 0)
+                SET total_distance = total_distance + IFNULL(ABS(:latitude - latest_latitude) + ABS(:longitude - latest_longitude), 0),
                     total_distance_updated_at = :recorded_at,
                     latest_latitude = :latitude,
                     latest_longitude = :longitude
