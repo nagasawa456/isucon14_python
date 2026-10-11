@@ -500,6 +500,10 @@ def app_post_ride_evaluation(
                 status_code=HTTPStatus.NOT_FOUND, detail="ride not found"
             )
 
+        conn.execute(
+            text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+            {"chair_id": ride.chair_id},
+        )
         status_id = str(ULID())
         conn.execute(
             text(

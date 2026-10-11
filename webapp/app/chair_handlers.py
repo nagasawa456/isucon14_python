@@ -164,6 +164,10 @@ def chair_post_coordinate(
                     and req.longitude == ride.pickup_longitude
                     and ride_status == "ENROUTE"
                 ):
+                    conn.execute(
+                        text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                        {"chair_id": chair.id},
+                    )
                     status_id = str(ULID())
                     conn.execute(
                         text(
@@ -188,6 +192,10 @@ def chair_post_coordinate(
                     and req.longitude == ride.destination_longitude
                     and ride_status == "CARRYING"
                 ):
+                    conn.execute(
+                        text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                        {"chair_id": chair.id},
+                    )
                     status_id = str(ULID())
                     conn.execute(
                         text(
@@ -325,6 +333,10 @@ def chair_post_ride_status(
         match req.status:
             # Acknowledge the ride
             case "ENROUTE":
+                conn.execute(
+                    text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                    {"chair_id": chair.id},
+                )
                 status_id = str(ULID())
                 conn.execute(
                     text(
@@ -351,6 +363,10 @@ def chair_post_ride_status(
                         status_code=HTTPStatus.BAD_REQUEST,
                         detail="chair has not arrived yet",
                     )
+                conn.execute(
+                    text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                    {"chair_id": chair.id},
+                )
                 status_id = str(ULID())
                 conn.execute(
                     text(

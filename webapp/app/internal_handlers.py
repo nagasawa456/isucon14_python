@@ -69,6 +69,10 @@ def internal_get_matching() -> None:
             candidates.remove(nearest)
         
         conn.execute(
+            text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+            params,
+        )
+        conn.execute(
             text(
                 """
                 UPDATE rides
