@@ -43,7 +43,7 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
 
 
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
             text(
                 """
@@ -60,10 +60,11 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
             ) AS d ON d.chair_id = c.id
             SET c.total_distance = d.total_distance,
                 c.total_distance_updated_at = d.total_distance_updated_at;
-        """)
-    )
+            """)
+        )
+        conn.commit()
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
             text(
                 """
@@ -78,14 +79,16 @@ def post_initialize(req: PostInitializeRequest) -> PostInitializeResponse:
                             c.latest_longitude = l.longitude;
             """)
         )
+        conn.commit()
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
             text(
                 "UPDATE settings SET value = :value WHERE name = 'payment_gateway_url'",
             ),
             {"value": req.payment_server},
         )
+        conn.commit()
 
     return PostInitializeResponse(language="python")
 

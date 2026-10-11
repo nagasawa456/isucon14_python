@@ -26,7 +26,7 @@ def app_auth_middleware(app_session: Annotated[str | None, Cookie()] = None) -> 
     if user is not None:
         return user
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         row = conn.execute(
             text("SELECT * FROM users WHERE access_token = :access_token"),
             {"access_token": app_session},
@@ -54,7 +54,7 @@ def owner_auth_middleware(
     if owner is not None:
         return owner
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         row = conn.execute(
             text("SELECT * FROM owners WHERE access_token = :access_token"),
             {"access_token": owner_session},
@@ -82,7 +82,7 @@ def chair_auth_middleware(
     if chair is not None:
         return chair
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         row = conn.execute(
             text("SELECT * FROM chairs WHERE access_token = :access_token"),
             {"access_token": chair_session},

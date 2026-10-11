@@ -156,13 +156,14 @@ def app_post_payment_methods(
             status_code=HTTPStatus.BAD_REQUEST, detail="token is required but was empty"
         )
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
             text(
                 "INSERT INTO payment_tokens (user_id, token) VALUES (:user_id, :token)"
             ),
             {"user_id": user.id, "token": req.token},
         )
+        conn.commit()
 
 
 class Coordinate(BaseModel):
@@ -196,7 +197,7 @@ class GetAppRidesResponse(BaseModel):
 def app_get_rides(
     user: Annotated[User, Depends(app_auth_middleware)],
 ) -> GetAppRidesResponse:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         rows = conn.execute(
             text(
                 "SELECT * FROM rides WHERE user_id = :user_id ORDER BY created_at DESC"
@@ -220,7 +221,7 @@ def app_get_rides(
                 ride.destination_latitude,
                 ride.destination_longitude,
             )
-
+        
             row = conn.execute(
                 text("SELECT * FROM chairs WHERE id = :id"), {"id": ride.chair_id}
             ).fetchone()
@@ -254,7 +255,7 @@ def app_get_rides(
             )
             items.append(item)
 
-    return GetAppRidesResponse(rides=items)
+        return GetAppRidesResponse(rides=items)
 
 
 class AppPostRidesRequest(BaseModel):
@@ -296,6 +297,7 @@ def app_post_rides(
         )
 
     ride_id = str(ULID())
+
     with engine.begin() as conn:
         rows = conn.execute(
             text("SELECT * FROM rides WHERE user_id = :user_id"), {"user_id": user.id}
@@ -385,7 +387,7 @@ def app_post_rides(
                     ),
                     {"ride_id": ride_id, "user_id": user.id, "code": coupon.code},
                 )
-
+    with engine.connect() as conn:
         row = conn.execute(
             text("SELECT * FROM rides WHERE id = :ride_id"), {"ride_id": ride_id}
         ).fetchone()
@@ -428,7 +430,7 @@ def app_post_rides_estimated_fare(
             detail="required fields(pickup_coordinate, destination_coordinate) are empty",
         )
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         discounted = calculate_discounted_fare(
             conn,
             user.id,
@@ -662,7 +664,7 @@ def app_get_notification(
 
     yet_sent = RideStatus.model_validate(yet_row)
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         fare = calculate_discounted_fare(
             conn,
             user.id,
@@ -712,7 +714,7 @@ def app_get_notification(
                     total_evaluation_avg=total_evaluation_avg,
                 ),
             )
-
+    with engine.begin() as conn:
         conn.execute(
             text(
                 "UPDATE ride_statuses SET app_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
@@ -801,7 +803,7 @@ def app_get_nearby_chairs(
     longitude: int,
     distance: int = 50,
 ) -> AppGetNearByChairsResponse:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         # 稼働中で、未完了ライドがなく、最新座標が距離内の椅子だけを1回で取る
         rows = conn.execute(
             text(

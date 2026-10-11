@@ -39,7 +39,7 @@ def chair_post_chairs(
             detail="some of required fields(name, model, chair_register_token) are empty",
         )
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         row = conn.execute(
             text(
                 "SELECT * FROM owners WHERE chair_register_token = :chair_register_token"
@@ -90,11 +90,12 @@ def chair_post_activity(
     chair: Annotated[Chair, Depends(chair_auth_middleware)],
     req: PostChairActivityRequest,
 ) -> None:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         conn.execute(
             text("UPDATE chairs SET is_active = :is_active WHERE id = :id"),
             {"is_active": req.is_active, "id": chair.id},
         )
+        conn.commit()
 
 
 class Coordinate(BaseModel):

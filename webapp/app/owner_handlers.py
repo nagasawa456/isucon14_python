@@ -103,7 +103,7 @@ def owner_get_sales(
     else:
         until_dt = datetime_fromtimestamp_millis(until)
 
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         rows = conn.execute(
             text("SELECT * FROM chairs WHERE owner_id = :owner_id"),
             {"owner_id": owner.id},
@@ -177,7 +177,7 @@ class OwnerGetChairResponse(BaseModel):
 def owner_get_chairs(
     owner: Annotated[Owner, Depends(owner_auth_middleware)],
 ) -> OwnerGetChairResponse:
-    with engine.begin() as conn:
+    with engine.connect() as conn:
         rows = conn.execute(
             text(
                 """
