@@ -501,7 +501,7 @@ def app_post_ride_evaluation(
             )
 
         conn.execute(
-            text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+            text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
             {"chair_id": ride.chair_id},
         )
         status_id = str(ULID())
@@ -514,10 +514,10 @@ def app_post_ride_evaluation(
         conn.execute(
             text(
                 """
-                UPDATE chairs
-                SET unsent_status_id = :status_id
-                WHERE id = :chair_id
-                  AND unsent_status_id IS NULL
+                INSERT INTO chair_unsent (chair_id, status_id)
+                VALUES (:chair_id, :status_id)
+                ON DUPLICATE KEY UPDATE
+                  status_id = IF(status_id IS NULL, :status_id, status_id)
                 """
             ),
             {"status_id": status_id, "chair_id": ride.chair_id},

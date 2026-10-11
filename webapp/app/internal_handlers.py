@@ -69,7 +69,7 @@ def internal_get_matching() -> None:
             candidates.remove(nearest)
         
         conn.execute(
-            text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+            text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
             params,
         )
         conn.execute(
@@ -87,11 +87,12 @@ def internal_get_matching() -> None:
         conn.execute(
             text(
                 """
-                UPDATE chairs c
-                JOIN ride_statuses rs ON rs.ride_id = :ride_id AND rs.status = 'MATCHING'
-                SET c.unsent_status_id = rs.id
-                WHERE c.id = :chair_id
-                  AND c.unsent_status_id IS NULL
+                INSERT INTO chair_unsent (chair_id, status_id)
+                SELECT :chair_id, rs.id
+                FROM ride_statuses rs
+                WHERE rs.ride_id = :ride_id AND rs.status = 'MATCHING'
+                ON DUPLICATE KEY UPDATE
+                  status_id = IF(status_id IS NULL, VALUES(status_id), status_id)
                 """
             ),
             params,

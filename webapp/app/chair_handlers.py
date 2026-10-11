@@ -165,7 +165,7 @@ def chair_post_coordinate(
                     and ride_status == "ENROUTE"
                 ):
                     conn.execute(
-                        text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                        text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
                         {"chair_id": chair.id},
                     )
                     status_id = str(ULID())
@@ -178,10 +178,10 @@ def chair_post_coordinate(
                     conn.execute(
                         text(
                             """
-                            UPDATE chairs
-                            SET unsent_status_id = :status_id
-                            WHERE id = :chair_id
-                              AND unsent_status_id IS NULL
+                            INSERT INTO chair_unsent (chair_id, status_id)
+                            VALUES (:chair_id, :status_id)
+                            ON DUPLICATE KEY UPDATE
+                              status_id = IF(status_id IS NULL, :status_id, status_id)
                             """
                         ),
                         {"status_id": status_id, "chair_id": chair.id},
@@ -193,7 +193,7 @@ def chair_post_coordinate(
                     and ride_status == "CARRYING"
                 ):
                     conn.execute(
-                        text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                        text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
                         {"chair_id": chair.id},
                     )
                     status_id = str(ULID())
@@ -206,10 +206,10 @@ def chair_post_coordinate(
                     conn.execute(
                         text(
                             """
-                            UPDATE chairs
-                            SET unsent_status_id = :status_id
-                            WHERE id = :chair_id
-                              AND unsent_status_id IS NULL
+                            INSERT INTO chair_unsent (chair_id, status_id)
+                            VALUES (:chair_id, :status_id)
+                            ON DUPLICATE KEY UPDATE
+                              status_id = IF(status_id IS NULL, :status_id, status_id)
                             """
                         ),
                         {"status_id": status_id, "chair_id": chair.id},
@@ -245,7 +245,7 @@ def chair_get_notification(
     with engine.begin() as conn:
         unsent_status_id = conn.execute(
             text(
-                "SELECT unsent_status_id FROM chairs WHERE id = :chair_id AND unsent_status_id IS NOT NULL FOR UPDATE"
+                "SELECT status_id FROM chair_unsent WHERE chair_id = :chair_id AND status_id IS NOT NULL FOR UPDATE"
             ),
             {"chair_id": chair.id},
         ).scalar()
@@ -284,7 +284,7 @@ def chair_get_notification(
         )
         conn.execute(
             text(
-                "UPDATE chairs SET unsent_status_id = NULL WHERE id = :chair_id"
+                "UPDATE chair_unsent SET status_id = NULL WHERE chair_id = :chair_id"
             ),
             {"chair_id": chair.id},
         )
@@ -334,7 +334,7 @@ def chair_post_ride_status(
             # Acknowledge the ride
             case "ENROUTE":
                 conn.execute(
-                    text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                    text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
                     {"chair_id": chair.id},
                 )
                 status_id = str(ULID())
@@ -347,10 +347,10 @@ def chair_post_ride_status(
                 conn.execute(
                     text(
                         """
-                        UPDATE chairs
-                        SET unsent_status_id = :status_id
-                        WHERE id = :chair_id
-                          AND unsent_status_id IS NULL
+                        INSERT INTO chair_unsent (chair_id, status_id)
+                        VALUES (:chair_id, :status_id)
+                        ON DUPLICATE KEY UPDATE
+                          status_id = IF(status_id IS NULL, :status_id, status_id)
                         """
                     ),
                     {"status_id": status_id, "chair_id": chair.id},
@@ -364,7 +364,7 @@ def chair_post_ride_status(
                         detail="chair has not arrived yet",
                     )
                 conn.execute(
-                    text("SELECT id FROM chairs WHERE id = :chair_id FOR UPDATE"),
+                    text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
                     {"chair_id": chair.id},
                 )
                 status_id = str(ULID())
@@ -377,10 +377,10 @@ def chair_post_ride_status(
                 conn.execute(
                     text(
                         """
-                        UPDATE chairs
-                        SET unsent_status_id = :status_id
-                        WHERE id = :chair_id
-                          AND unsent_status_id IS NULL
+                        INSERT INTO chair_unsent (chair_id, status_id)
+                        VALUES (:chair_id, :status_id)
+                        ON DUPLICATE KEY UPDATE
+                          status_id = IF(status_id IS NULL, :status_id, status_id)
                         """
                     ),
                     {"status_id": status_id, "chair_id": chair.id},
