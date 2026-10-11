@@ -243,6 +243,16 @@ class ChairGetNotificationResponse(BaseModel):
 def chair_get_notification(
     chair: Annotated[Chair, Depends(chair_auth_middleware)],
 ) -> ChairGetNotificationResponse:
+    with engine.connect() as conn:
+        unsent_status_id = conn.execute(
+            text(
+                "SELECT status_id FROM chair_unsent WHERE chair_id = :chair_id AND status_id IS NOT NULL"
+            ),
+            {"chair_id": chair.id},
+        ).scalar()
+        if unsent_status_id is None:
+            return ChairGetNotificationResponse(data=None, retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS)
+            
     with engine.begin() as conn:
         unsent_status_id = conn.execute(
             text(
