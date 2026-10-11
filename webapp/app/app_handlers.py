@@ -500,11 +500,23 @@ def app_post_ride_evaluation(
                 status_code=HTTPStatus.NOT_FOUND, detail="ride not found"
             )
 
+        status_id = str(ULID())
         conn.execute(
             text(
                 "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
             ),
-            {"id": str(ULID()), "ride_id": ride_id, "status": "COMPLETED"},
+            {"id": status_id, "ride_id": ride_id, "status": "COMPLETED"},
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE chairs
+                SET unsent_status_id = :status_id
+                WHERE id = :chair_id
+                  AND unsent_status_id IS NULL
+                """
+            ),
+            {"status_id": status_id, "chair_id": ride.chair_id},
         )
 
         conn.execute(

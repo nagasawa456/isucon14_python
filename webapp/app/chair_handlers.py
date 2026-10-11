@@ -164,11 +164,23 @@ def chair_post_coordinate(
                     and req.longitude == ride.pickup_longitude
                     and ride_status == "ENROUTE"
                 ):
+                    status_id = str(ULID())
                     conn.execute(
                         text(
                             "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                         ),
-                        {"id": str(ULID()), "ride_id": ride.id, "status": "PICKUP"},
+                        {"id": status_id, "ride_id": ride.id, "status": "PICKUP"},
+                    )
+                    conn.execute(
+                        text(
+                            """
+                            UPDATE chairs
+                            SET unsent_status_id = :status_id
+                            WHERE id = :chair_id
+                              AND unsent_status_id IS NULL
+                            """
+                        ),
+                        {"status_id": status_id, "chair_id": chair.id},
                     )
 
                 if (
@@ -176,11 +188,23 @@ def chair_post_coordinate(
                     and req.longitude == ride.destination_longitude
                     and ride_status == "CARRYING"
                 ):
+                    status_id = str(ULID())
                     conn.execute(
                         text(
                             "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status) "
                         ),
-                        {"id": str(ULID()), "ride_id": ride.id, "status": "ARRIVED"},
+                        {"id": status_id, "ride_id": ride.id, "status": "ARRIVED"},
+                    )
+                    conn.execute(
+                        text(
+                            """
+                            UPDATE chairs
+                            SET unsent_status_id = :status_id
+                            WHERE id = :chair_id
+                              AND unsent_status_id IS NULL
+                            """
+                        ),
+                        {"status_id": status_id, "chair_id": chair.id},
                     )
 
     return ChairPostCoordinateResponse(
@@ -210,41 +234,51 @@ class ChairGetNotificationResponse(BaseModel):
 def chair_get_notification(
     chair: Annotated[Chair, Depends(chair_auth_middleware)],
 ) -> ChairGetNotificationResponse:
-    with engine.connect() as conn:
-        row = conn.execute(
+    with engine.begin() as conn:
+        unsent_status_id = conn.execute(
             text(
-                "SELECT * FROM rides WHERE chair_id = :chair_id ORDER BY updated_at DESC LIMIT 1"
+                "SELECT unsent_status_id FROM chairs WHERE id = :chair_id AND unsent_status_id IS NOT NULL FOR UPDATE"
             ),
             {"chair_id": chair.id},
-        ).fetchone()
-        if row is None:
+        ).scalar()
+        if unsent_status_id is None:
             return ChairGetNotificationResponse(data=None, retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS)
 
-        ride = Ride.model_validate(row)
-        yet_row = conn.execute(
-            text(
-                "SELECT * FROM ride_statuses WHERE ride_id = :ride_id AND chair_sent_at IS NULL ORDER BY created_at ASC LIMIT 1"
-            ),
-            {"ride_id": ride.id},
+        status_row = conn.execute(
+            text("SELECT * FROM ride_statuses WHERE id = :id"),
+            {"id": unsent_status_id},
         ).fetchone()
+        if status_row is None:
+            raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        yet_sent = RideStatus.model_validate(status_row)
 
-    if yet_row is None:
-        return ChairGetNotificationResponse(data=None, retry_after_ms=CHAIR_NOTIFICATION_RETRY_AFTER_MS)
+        ride_row = conn.execute(
+            text("SELECT * FROM rides WHERE id = :id"),
+            {"id": yet_sent.ride_id},
+        ).fetchone()
+        if ride_row is None:
+            raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
+        ride = Ride.model_validate(ride_row)
 
-    yet_sent = RideStatus.model_validate(yet_row)
-    with engine.begin() as conn:
-        row = conn.execute(
+        user_row = conn.execute(
             text("SELECT * FROM users WHERE id = :id FOR SHARE"),
             {"id": ride.user_id},
         ).fetchone()
-        if row is None:
+        if user_row is None:
             raise HTTPException(status_code=HTTPStatus.INTERNAL_SERVER_ERROR)
-        user = User.model_validate(row)
+        user = User.model_validate(user_row)
+
         conn.execute(
             text(
                 "UPDATE ride_statuses SET chair_sent_at = CURRENT_TIMESTAMP(6) WHERE id = :id"
             ),
             {"id": yet_sent.id},
+        )
+        conn.execute(
+            text(
+                "UPDATE chairs SET unsent_status_id = NULL WHERE id = :chair_id"
+            ),
+            {"chair_id": chair.id},
         )
 
     return ChairGetNotificationResponse(
@@ -291,11 +325,23 @@ def chair_post_ride_status(
         match req.status:
             # Acknowledge the ride
             case "ENROUTE":
+                status_id = str(ULID())
                 conn.execute(
                     text(
                         "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                     ),
-                    {"id": str(ULID()), "ride_id": ride.id, "status": "ENROUTE"},
+                    {"id": status_id, "ride_id": ride.id, "status": "ENROUTE"},
+                )
+                conn.execute(
+                    text(
+                        """
+                        UPDATE chairs
+                        SET unsent_status_id = :status_id
+                        WHERE id = :chair_id
+                          AND unsent_status_id IS NULL
+                        """
+                    ),
+                    {"status_id": status_id, "chair_id": chair.id},
                 )
             # After Picking up user
             case "CARRYING":
@@ -305,11 +351,23 @@ def chair_post_ride_status(
                         status_code=HTTPStatus.BAD_REQUEST,
                         detail="chair has not arrived yet",
                     )
+                status_id = str(ULID())
                 conn.execute(
                     text(
                         "INSERT INTO ride_statuses (id, ride_id, status) VALUES (:id, :ride_id, :status)"
                     ),
-                    {"id": str(ULID()), "ride_id": ride.id, "status": "CARRYING"},
+                    {"id": status_id, "ride_id": ride.id, "status": "CARRYING"},
+                )
+                conn.execute(
+                    text(
+                        """
+                        UPDATE chairs
+                        SET unsent_status_id = :status_id
+                        WHERE id = :chair_id
+                          AND unsent_status_id IS NULL
+                        """
+                    ),
+                    {"status_id": status_id, "chair_id": chair.id},
                 )
             case _:
                 raise HTTPException(

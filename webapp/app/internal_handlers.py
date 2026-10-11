@@ -79,3 +79,16 @@ def internal_get_matching() -> None:
             ),
             params,
         )
+        
+        conn.execute(
+            text(
+                """
+                UPDATE chairs c
+                JOIN ride_statuses rs ON rs.ride_id = :ride_id AND rs.status = 'MATCHING'
+                SET c.unsent_status_id = rs.id
+                WHERE c.id = :chair_id
+                  AND c.unsent_status_id IS NULL
+                """
+            ),
+            params,
+        )
