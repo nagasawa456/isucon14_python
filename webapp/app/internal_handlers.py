@@ -9,7 +9,7 @@ from .sql import engine
 router = APIRouter(prefix="/api/internal")
 
 # 乗車位置までこの距離を超える椅子は割り当てない
-MAX_PICKUP_DISTANCE = 200
+MAX_PICKUP_DISTANCE = 300
 
 
 # このAPIをインスタンス内から一定間隔で叩かせることで、椅子とライドをマッチングさせる
