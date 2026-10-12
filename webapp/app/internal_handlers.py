@@ -8,6 +8,9 @@ from .sql import engine
 
 router = APIRouter(prefix="/api/internal")
 
+# これより遠い椅子は別地域にいるので割り当てない
+MAX_PICKUP_DISTANCE = 400
+
 
 # このAPIをインスタンス内から一定間隔で叩かせることで、椅子とライドをマッチングさせる
 @router.get("/matching", status_code=HTTPStatus.NO_CONTENT)
@@ -47,17 +50,26 @@ def internal_get_matching() -> None:
         if not chairs:
             return
 
-        # 古いライドから一番近い椅子を割り当てる
+        # 古いライドから、乗車位置まで一定距離以内で一番早い椅子を割り当てる
         candidates = list(chairs)
         params = []
         for ride in rides:
             if not candidates:
                 break
+            near = [
+                chair
+                for chair in candidates
+                if abs(chair.latitude - ride.pickup_latitude)
+                + abs(chair.longitude - ride.pickup_longitude)
+                < MAX_PICKUP_DISTANCE
+            ]
+            if not near:
+                continue
             nearest = min(
-                candidates,
+                near,
                 key=lambda chair: (abs(chair.latitude - ride.pickup_latitude)
-                + abs(chair.longitude - ride.pickup_longitude) 
-                + abs(ride.pickup_latitude - ride.destination_latitude) 
+                + abs(chair.longitude - ride.pickup_longitude)
+                + abs(ride.pickup_latitude - ride.destination_latitude)
                 + abs(ride.pickup_longitude - ride.destination_longitude)) / chair.speed,
             )
             params.append(
@@ -67,7 +79,10 @@ def internal_get_matching() -> None:
                 }
             )
             candidates.remove(nearest)
-        
+
+        if not params:
+            return
+
         conn.execute(
             text("SELECT chair_id FROM chair_unsent WHERE chair_id = :chair_id FOR UPDATE"),
             params,
