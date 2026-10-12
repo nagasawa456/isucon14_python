@@ -8,8 +8,8 @@ from .sql import engine
 
 router = APIRouter(prefix="/api/internal")
 
-# これより遠い椅子は別地域にいるので割り当てない
-MAX_PICKUP_DISTANCE = 400
+# 乗車位置までこの距離を超える椅子は割り当てない
+MAX_PICKUP_DISTANCE = 200
 
 
 # このAPIをインスタンス内から一定間隔で叩かせることで、椅子とライドをマッチングさせる
@@ -61,7 +61,7 @@ def internal_get_matching() -> None:
                 for chair in candidates
                 if abs(chair.latitude - ride.pickup_latitude)
                 + abs(chair.longitude - ride.pickup_longitude)
-                < MAX_PICKUP_DISTANCE
+                <= MAX_PICKUP_DISTANCE
             ]
             if not near:
                 continue
