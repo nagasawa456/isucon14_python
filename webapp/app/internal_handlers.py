@@ -40,9 +40,7 @@ def internal_get_matching() -> None:
                     SELECT 1
                     FROM rides r
                     WHERE r.chair_id = c.id
-                      AND (SELECT COUNT(rs.chair_sent_at)
-                           FROM ride_statuses rs
-                           WHERE rs.ride_id = r.id) < 6
+                      AND r.evaluation IS NULL
                       )
                 """
                 ),

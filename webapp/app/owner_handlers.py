@@ -115,7 +115,7 @@ def owner_get_sales(
         for chair in chairs:
             rows = conn.execute(
                 text(
-                    "SELECT rides.* FROM rides JOIN ride_statuses ON rides.id = ride_statuses.ride_id WHERE chair_id = :chair_id AND status = 'COMPLETED' AND updated_at BETWEEN :since AND :until + INTERVAL 999 MICROSECOND"
+                    "SELECT * FROM rides WHERE chair_id = :chair_id AND evaluation IS NOT NULL AND updated_at BETWEEN :since AND :until + INTERVAL 999 MICROSECOND"
                 ),
                 {
                     "chair_id": chair.id,

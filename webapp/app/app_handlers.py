@@ -822,13 +822,7 @@ def app_get_nearby_chairs(
                       SELECT 1
                       FROM rides r
                       WHERE r.chair_id = c.id
-                        AND IFNULL((
-                          SELECT rs.status
-                          FROM ride_statuses rs
-                          WHERE rs.ride_id = r.id
-                          ORDER BY rs.created_at DESC, rs.id DESC
-                          LIMIT 1
-                        ), '') <> 'COMPLETED'
+                        AND r.evaluation IS NULL
                     )
                 """
             ),
