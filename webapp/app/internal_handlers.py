@@ -40,7 +40,16 @@ def internal_get_matching() -> None:
                     SELECT 1
                     FROM rides r
                     WHERE r.chair_id = c.id
-                      AND r.evaluation IS NULL
+                      AND (
+                        r.evaluation IS NULL
+                        OR NOT EXISTS (
+                          SELECT 1
+                          FROM ride_statuses rs
+                          WHERE rs.ride_id = r.id
+                            AND rs.status = 'COMPLETED'
+                            AND rs.chair_sent_at IS NOT NULL
+                        )
+                      )
                       )
                 """
                 ),

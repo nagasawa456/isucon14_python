@@ -293,9 +293,25 @@ def chair_get_notification(
             ),
             {"id": yet_sent.id},
         )
+        # 未送信が1件しか置けないので、送ったあとに同じ椅子の次の未送信を入れる。
+        # そうしないと COMPLETED が落ち、次のライドの通知が先に届く。
         conn.execute(
             text(
-                "UPDATE chair_unsent SET status_id = NULL WHERE chair_id = :chair_id"
+                """
+                UPDATE chair_unsent
+                SET status_id = (
+                    SELECT id FROM (
+                        SELECT rs.id
+                        FROM ride_statuses rs
+                        INNER JOIN rides r ON r.id = rs.ride_id
+                        WHERE r.chair_id = :chair_id
+                          AND rs.chair_sent_at IS NULL
+                        ORDER BY r.created_at ASC, rs.created_at ASC, rs.id ASC
+                        LIMIT 1
+                    ) next_status
+                )
+                WHERE chair_id = :chair_id
+                """
             ),
             {"chair_id": chair.id},
         )
