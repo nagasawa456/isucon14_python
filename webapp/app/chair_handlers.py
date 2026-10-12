@@ -113,21 +113,7 @@ def chair_post_coordinate(
     req: Coordinate,
 ) -> ChairPostCoordinateResponse:
     with engine.begin() as conn:
-        chair_location_id = str(ULID())
         recorded_at = datetime.datetime.now()
-        conn.execute(
-            text(
-                "INSERT INTO chair_locations (id, chair_id, latitude, longitude, created_at) VALUES (:id, :chair_id, :latitude, :longitude, :created_at)"
-            ),
-            {
-                "id": chair_location_id,
-                "chair_id": chair.id,
-                "latitude": req.latitude,
-                "longitude": req.longitude,
-                "created_at": recorded_at,
-            },
-        )
-
         conn.execute(
             text(
                 """
