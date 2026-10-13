@@ -530,7 +530,8 @@ def app_post_ride_evaluation(
                 """
                 UPDATE chairs
                 SET total_ride_count = total_ride_count + 1,
-                    total_evaluation_sum = total_evaluation_sum + :evaluation
+                    total_evaluation_sum = total_evaluation_sum + :evaluation,
+                    is_assignable = TRUE
                 WHERE id = :chair_id
                 """
             ),
@@ -818,12 +819,7 @@ def app_get_nearby_chairs(
                     AND c.latest_latitude BETWEEN :latitude - :distance AND :latitude + :distance
                     AND c.latest_longitude BETWEEN :longitude - :distance AND :longitude + :distance
                     AND ABS(c.latest_latitude - :latitude) + ABS(c.latest_longitude - :longitude) <= :distance
-                    AND NOT EXISTS (
-                      SELECT 1
-                      FROM rides r
-                      WHERE r.chair_id = c.id
-                        AND r.evaluation IS NULL
-                    )
+                    AND c.is_assignable = TRUE
                 """
             ),
             {"latitude": latitude, "longitude": longitude, "distance": distance},

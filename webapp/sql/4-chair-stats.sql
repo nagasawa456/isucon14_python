@@ -5,7 +5,8 @@ ALTER TABLE chairs
     ADD COLUMN latest_longitude INTEGER NULL COMMENT '最新の経度',
     ADD COLUMN total_distance INTEGER NOT NULL DEFAULT 0 COMMENT '総走行距離',
     ADD COLUMN total_distance_updated_at DATETIME(6) NULL COMMENT '総走行距離の更新日時',
-    ADD INDEX idx_active_lat (is_active, latest_latitude);
+    ADD COLUMN is_assignable TINYINT(1) NOT NULL DEFAULT 1 COMMENT '未完了のライドがなく割り当て可能か',
+    ADD INDEX idx_active_lat (is_active, is_assignable, latest_latitude);
 
 DROP TABLE IF EXISTS chair_unsent;
 CREATE TABLE chair_unsent
@@ -31,3 +32,7 @@ JOIN (
 ) s ON s.chair_id = c.id
 SET c.total_ride_count = s.total_ride_count,
     c.total_evaluation_sum = s.total_evaluation_sum;
+
+UPDATE chairs c
+JOIN rides r ON r.chair_id = c.id AND r.evaluation IS NULL
+SET c.is_assignable = FALSE;

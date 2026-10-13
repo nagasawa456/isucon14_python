@@ -34,22 +34,15 @@ def internal_get_matching() -> None:
                 FROM chairs c
                 JOIN chair_models cm ON cm.name = c.model
                 WHERE c.is_active = TRUE
+                  AND c.is_assignable = TRUE
                   AND c.latest_latitude IS NOT NULL
                   AND c.latest_longitude IS NOT NULL
                   AND NOT EXISTS (
                     SELECT 1
                     FROM rides r
+                    INNER JOIN ride_statuses rs ON rs.ride_id = r.id AND rs.status = 'COMPLETED'
                     WHERE r.chair_id = c.id
-                      AND (
-                        r.evaluation IS NULL
-                        OR NOT EXISTS (
-                          SELECT 1
-                          FROM ride_statuses rs
-                          WHERE rs.ride_id = r.id
-                            AND rs.status = 'COMPLETED'
-                            AND rs.chair_sent_at IS NOT NULL
-                        )
-                      )
+                      AND rs.chair_sent_at IS NULL
                       )
                 """
                 ),
@@ -101,6 +94,17 @@ def internal_get_matching() -> None:
                 SET chair_id = :chair_id
                 WHERE id = :ride_id
                 AND chair_id IS NULL
+                """
+            ),
+            params,
+        )
+        conn.execute(
+            text(
+                """
+                UPDATE chairs c
+                INNER JOIN rides r ON r.id = :ride_id AND r.chair_id = c.id
+                SET c.is_assignable = FALSE
+                WHERE c.id = :chair_id
                 """
             ),
             params,
